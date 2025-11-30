@@ -22,7 +22,7 @@ class Producto(models.Model):
     descripcion = models.TextField(blank=True, null=True)
     costo = models.DecimalField(max_digits=10, decimal_places=2)
     stock_actual = models.IntegerField(default=0)
-    nivel_minimo_stock = models.IntegerField(default=0)
+    nivel_minimo_stock = models.IntegerField(default=5)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     stock_actual = models.IntegerField(default=0)
     # NUEVO CAMPO:
