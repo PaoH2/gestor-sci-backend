@@ -15,6 +15,8 @@ SECRET_KEY = 'django-insecure-hlgsr(owluv-ct5murng%bnbs*p)bp7__pa%6ialhs#c!&bzz1
 # -------------------------------------------------------------
 # 1. CONFIGURACIÓN DE DESPLIEGUE (Render)
 # -------------------------------------------------------------
+
+# Detecta si estamos en Render (producción)
 DEBUG = 'RENDER' not in os.environ
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
@@ -57,7 +59,6 @@ ROOT_URLCONF = 'inventario_backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        # Incluye las rutas del admin por defecto
         'DIRS': [], 
         'APP_DIRS': True, 
         'OPTIONS': {
@@ -76,7 +77,7 @@ WSGI_APPLICATION = 'inventario_backend.wsgi.application'
 # 4. DATABASE (Configuración Híbrida)
 DATABASES = {
     'default': dj_database_url.config(
-        # Render usará su DATABASE_URL, si no existe (estamos en local) usa esta:
+        # Render usará su DATABASE_URL, si no existe (estamos en local) usa la configuración local:
         default='postgresql://admin_inventario:admin@127.0.0.1:5432/inventario_db',
         conn_max_age=600
     )
@@ -87,7 +88,7 @@ DATABASES = {
 # 5. ARCHIVOS ESTÁTICOS (STATIC_ROOT)
 STATIC_URL = 'static/'
 # Directorio donde se guardarán los archivos estáticos en producción (Render)
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # <--- CORRECCIÓN VITAL
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') 
 # Directorios donde buscar archivos estáticos en desarrollo
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
@@ -100,10 +101,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # --- CONFIGURACIÓN PERSONALIZADA ---
 AUTH_USER_MODEL = 'core.Usuario'
 
+# 6. CORS (CORRECCIÓN VITAL: Solo dominios, no rutas como /api)
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:4200",
-    "https://gestor-sci-backend.onrender.com/api/",
+    # Agregamos la URL de Netlify (sin el /login o /api)
+    "https://store-hub-sgi.netlify.app",
 ]
+
+# Agregamos el host de Render para que la API pueda hablar consigo misma
 if RENDER_EXTERNAL_HOSTNAME:
     CORS_ALLOWED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
     
