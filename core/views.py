@@ -7,6 +7,7 @@ from django.db.models import Sum, F
 from django.db import transaction
 import time
 from datetime import datetime # Importante para la fecha del ticket
+from django.db.models import Sum, F, Q
 
 # Importamos los modelos
 from .models import Usuario, Producto, Movimiento, Venta, DetalleVenta
@@ -259,14 +260,20 @@ class DashboardView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        total_productos = Producto.objects.count()
-        # Usamos una lista por comprensión para evitar problemas con None
-        valor_inventario = sum([p.stock_actual * p.costo for p in Producto.objects.all()])
-        total_stock = Producto.objects.aggregate(Sum('stock_actual'))['stock_actual__sum'] or 0
+        total_productos = Producto.objects.filter(is_active=True).count()
         
-        productos_bajo_stock = Producto.objects.filter(
-            nivel_minimo_stock__gt=0, 
-            stock_actual__lte=F('nivel_minimo_stock')
+        # Calculamos valor solo de productos activos
+        valor_inventario = sum([p.stock_actual * p.costo for p in Producto.objects.filter(is_active=True)])
+        
+        total_stock = Producto.objects.filter(is_active=True).aggregate(Sum('stock_actual'))['stock_actual__sum'] or 0
+        
+        # --- AQUÍ ESTÁ EL CAMBIO CLAVE ---
+        # Contamos si:
+        # 1. Tiene configuración de alerta Y el stock es bajo.
+        # 2. O (OR) si el stock es 0 (aunque no tenga configuración).
+        productos_bajo_stock = Producto.objects.filter(is_active=True).filter(
+            Q(nivel_minimo_stock__gt=0, stock_actual__lte=F('nivel_minimo_stock')) | 
+            Q(stock_actual=0)
         ).count()
 
         total_entradas = Movimiento.objects.filter(tipo='Entrada').count()
