@@ -102,6 +102,7 @@ AUTH_USER_MODEL = 'core.Usuario'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:4200",
+    "https://gestor-sci-backend.onrender.com/api/",
 ]
 if RENDER_EXTERNAL_HOSTNAME:
     CORS_ALLOWED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
