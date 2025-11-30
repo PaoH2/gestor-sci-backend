@@ -104,11 +104,11 @@ AUTH_USER_MODEL = 'core.Usuario'
 # 6. CORS (CORRECCIÓN VITAL: Solo dominios, no rutas como /api)
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:4200",
+    "https://gestor-sci-frontend.vercel.app"
 ]
 
-# --- USAMOS COMODÍN PARA NETLIFY EN PRODUCCIÓN ---
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r'^https?://.*\.netlify\.app$', # Acepta cualquier subdominio de netlify.app
+CSRF_TRUSTED_ORIGINS = [
+    "https://gestor-sci-frontend.vercel.app",
 ]
 
 # Agregamos el host de Render para que la API pueda hablar consigo misma
