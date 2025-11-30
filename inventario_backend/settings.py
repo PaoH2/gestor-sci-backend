@@ -104,8 +104,11 @@ AUTH_USER_MODEL = 'core.Usuario'
 # 6. CORS (CORRECCIÓN VITAL: Solo dominios, no rutas como /api)
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:4200",
-    # Agregamos la URL de Netlify (sin el /login o /api)
-    "https://store-hub-sgi.netlify.app",
+]
+
+# --- USAMOS COMODÍN PARA NETLIFY EN PRODUCCIÓN ---
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^https?://.*\.netlify\.app$', # Acepta cualquier subdominio de netlify.app
 ]
 
 # Agregamos el host de Render para que la API pueda hablar consigo misma
@@ -125,3 +128,13 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
+```
+
+### 🚀 Acciones Finales
+
+1.  **Guarda el Canvas.**
+2.  **Sube los cambios a GitHub:** Render iniciará un nuevo despliegue.
+
+    ```bash
+    git commit -am "Fix: CORS con regex para aceptar cualquier dominio de Netlify"
+    git push origin main
