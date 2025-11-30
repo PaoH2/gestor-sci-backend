@@ -128,13 +128,3 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
-```
-
-### 🚀 Acciones Finales
-
-1.  **Guarda el Canvas.**
-2.  **Sube los cambios a GitHub:** Render iniciará un nuevo despliegue.
-
-    ```bash
-    git commit -am "Fix: CORS con regex para aceptar cualquier dominio de Netlify"
-    git push origin main
