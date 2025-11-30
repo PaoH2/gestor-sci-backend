@@ -3,10 +3,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework_simplejwt.views import TokenObtainPairView
-from django.db.models import Sum, F, Count, Q
+from django.db.models import Sum, F
 from django.db import transaction
 import time
-from .serializers import VentaSerializer
+from datetime import datetime # Importante para la fecha del ticket
 
 # Importamos los modelos
 from .models import Usuario, Producto, Movimiento, Venta, DetalleVenta
@@ -15,7 +15,8 @@ from .serializers import (
     UsuarioSerializer, 
     ProductoSerializer, 
     MovimientoSerializer, 
-    MyTokenObtainPairSerializer
+    MyTokenObtainPairSerializer,
+    VentaSerializer
 )
 
 # --- PERMISOS ---
@@ -52,50 +53,37 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated(), IsSuperadmin()]
         return [permissions.IsAuthenticated()]
 
+# --- PRODUCTOS ---
 class ProductoViewSet(viewsets.ModelViewSet):
-    # Traemos solo los activos por defecto
     queryset = Producto.objects.filter(is_active=True)
     serializer_class = ProductoSerializer
-    ##permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'sku'
     
     def get_permissions(self):
-        # Si la acción es 'destroy' (borrar), exigimos ser Superadmin
         if self.action == 'destroy':
             return [permissions.IsAuthenticated(), IsSuperadmin()]
-        
-        # Para todo lo demás (ver, crear, editar), solo pedimos estar logueado
         return [permissions.IsAuthenticated()]
-    # --- NUEVO MÉTODO CREATE (Resurrección) ---
+
     def create(self, request, *args, **kwargs):
         sku = request.data.get('SKU')
-        
-        # 1. Buscamos si existe un producto "muerto" con ese SKU
         producto_inactivo = Producto.objects.filter(sku=sku, is_active=False).first()
 
         if producto_inactivo:
-            # 2. Si existe, lo revivimos
             producto_inactivo.is_active = True
-            
-            # Actualizamos sus datos con los nuevos que mandaste (Nombre, Costo, etc.)
             serializer = self.get_serializer(producto_inactivo, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             self.perform_update(serializer)
 
-            # Registramos el evento en el historial como una "Reactivación" o Creación
             Movimiento.objects.create(
-                tipo='Creacion', # Lo marcamos como creación para el usuario
+                tipo='Creacion',
                 producto=producto_inactivo,
                 cantidad=producto_inactivo.stock_actual,
                 usuario=request.user
             )
-            
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        # 3. Si no existe, creamos uno nuevo normalmente
         return super().create(request, *args, **kwargs)
 
-    # --- MÉTODOS QUE YA TENÍAS (Mantén estos igual) ---
     def perform_create(self, serializer):
         producto_nuevo = serializer.save()
         Movimiento.objects.create(
@@ -176,12 +164,13 @@ class MovimientoViewSet(viewsets.ViewSet):
         except Producto.DoesNotExist:
             return Response({'error': 'Producto no encontrado.'}, status=404)
 
-# --- VENTAS (POS) ---
+# --- VENTAS (POS) - AQUÍ ESTÁ LA CORRECCIÓN PRINCIPAL ---
 class VentaViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Venta.objects.all().order_by('-fecha') # Las más recientes primero
+    queryset = Venta.objects.all().order_by('-fecha')
     serializer_class = VentaSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    # Aseguramos que acepte POST para solucionar el error 405
     @action(detail=False, methods=['post'])
     def registrar(self, request):
         items = request.data.get('items', [])
@@ -192,35 +181,47 @@ class VentaViewSet(viewsets.ReadOnlyModelViewSet):
 
         try:
             with transaction.atomic():
+                # Creamos un folio único basado en el tiempo
                 folio_nuevo = f"V-{int(time.time())}"
+                
                 venta = Venta.objects.create(
                     folio=folio_nuevo,
                     total=total_recibido,
                     usuario=request.user
+                    # La fecha se pone sola si tienes auto_now_add=True en el modelo
                 )
 
-                for item in items:
-                    prod_id = item.get('id_producto')
-                    cantidad = int(item.get('cantidad'))
-                    precio = item.get('precio')
+                # Lista para guardar los datos del ticket
+                items_ticket = []
 
+                for item in items:
+                    prod_id = item.get('id_producto') # O SKU, depende de tu frontend
+                    cantidad = int(item.get('cantidad'))
+                    precio = float(item.get('precio')) # Aseguramos que sea número
+
+                    # Bloqueamos el producto para evitar condiciones de carrera
                     producto_db = Producto.objects.select_for_update().get(id=prod_id)
 
                     if producto_db.stock_actual < cantidad:
                         raise Exception(f"Stock insuficiente para {producto_db.nombre}")
 
+                    # Descontamos stock
                     producto_db.stock_actual -= cantidad
                     producto_db.save()
 
+                    # Calculamos subtotal
+                    subtotal_item = precio * cantidad
+
+                    # Guardamos el detalle
                     DetalleVenta.objects.create(
                         venta=venta,
                         producto=producto_db,
                         cantidad=cantidad,
                         precio_unitario=precio,
-                        subtotal=float(precio) * cantidad
+                        subtotal=subtotal_item
                     )
                     
-                    # Registro en Kardex (Movimientos)
+                    # Guardamos movimiento en Kardex
                     Movimiento.objects.create(
                         tipo='Salida',
                         producto=producto_db,
@@ -228,10 +229,28 @@ class VentaViewSet(viewsets.ReadOnlyModelViewSet):
                         usuario=request.user
                     )
 
-                return Response({'message': 'Venta registrada', 'folio': folio_nuevo}, status=201)
+                    # --- ARMADO DEL TICKET ---
+                    items_ticket.append({
+                        "producto": producto_db.nombre,
+                        "cantidad": cantidad,
+                        "precio_unit": precio,
+                        "subtotal": subtotal_item
+                    })
+
+                # --- RESPUESTA FINAL CON DATOS DEL TICKET ---
+                return Response({
+                    'message': 'Venta registrada exitosamente',
+                    'ticket': {
+                        'folio': folio_nuevo,
+                        'fecha': datetime.now().strftime("%d/%m/%Y %H:%M"),
+                        'cajero': request.user.email, # O username
+                        'items': items_ticket,
+                        'total': total_recibido
+                    }
+                }, status=201)
 
         except Producto.DoesNotExist:
-            return Response({'error': 'Producto no encontrado.'}, status=404)
+            return Response({'error': 'Uno de los productos no existe.'}, status=404)
         except Exception as e:
             return Response({'error': str(e)}, status=400)
 
@@ -241,6 +260,7 @@ class DashboardView(APIView):
 
     def get(self, request):
         total_productos = Producto.objects.count()
+        # Usamos una lista por comprensión para evitar problemas con None
         valor_inventario = sum([p.stock_actual * p.costo for p in Producto.objects.all()])
         total_stock = Producto.objects.aggregate(Sum('stock_actual'))['stock_actual__sum'] or 0
         
