@@ -2,7 +2,7 @@
 Django settings for inventario_backend project.
 """
 import os
-import dj_database_url # Necesario para la conexión a bases de datos en la nube
+import dj_database_url 
 from datetime import timedelta
 from pathlib import Path
 
@@ -15,11 +15,8 @@ SECRET_KEY = 'django-insecure-hlgsr(owluv-ct5murng%bnbs*p)bp7__pa%6ialhs#c!&bzz1
 # -------------------------------------------------------------
 # 1. CONFIGURACIÓN DE DESPLIEGUE (Render)
 # -------------------------------------------------------------
-
-# Detecta si estamos en Render (producción)
 DEBUG = 'RENDER' not in os.environ
 
-# Permitimos hosts para desarrollo y el host de Render (se define con una variable de entorno)
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
@@ -41,10 +38,10 @@ INSTALLED_APPS = [
     'core',
 ]
 
-# 2. MIDDLEWARE (Agregamos WhiteNoise)
+# 2. MIDDLEWARE (Incluye WhiteNoise)
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware', # <--- AGREGADO: Para servir archivos estáticos en Render
+    'whitenoise.middleware.WhiteNoiseMiddleware', # <--- AGREGADO
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -56,43 +53,56 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'inventario_backend.urls'
 
-# ... (TEMPLATES, WSGI_APPLICATION siguen igual) ...
+# 3. TEMPLATES (CORRECCIÓN VITAL PARA EL ADMIN)
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        # Incluye las rutas del admin por defecto
+        'DIRS': [], 
+        'APP_DIRS': True, 
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
 
-# 3. DATABASE (Configuración Híbrida)
+WSGI_APPLICATION = 'inventario_backend.wsgi.application'
+
+# 4. DATABASE (Configuración Híbrida)
 DATABASES = {
     'default': dj_database_url.config(
-        # La variable de entorno DATABASE_URL (de Render) tiene prioridad.
-        # Si no existe (estamos en local), usa la configuración local de PostgreSQL.
-        default=f'postgresql://admin_inventario:admin@127.0.0.1:5432/inventario_db',
+        # Render usará su DATABASE_URL, si no existe (estamos en local) usa esta:
+        default='postgresql://admin_inventario:admin@127.0.0.1:5432/inventario_db',
         conn_max_age=600
     )
 }
 
-
 # ... (Password validation, LANGUAGE_CODE, TIME_ZONE, USE_I18N, USE_TZ siguen igual) ...
 
-# 4. ARCHIVOS ESTÁTICOS (STATICFILES)
+# 5. ARCHIVOS ESTÁTICOS (STATIC_ROOT)
 STATIC_URL = 'static/'
-# El directorio donde Django buscará archivos estáticos
+# Directorio donde se guardarán los archivos estáticos en producción (Render)
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # <--- CORRECCIÓN VITAL
+# Directorios donde buscar archivos estáticos en desarrollo
 STATICFILES_DIRS = [
-    BASE_DIR / "static",
+    os.path.join(BASE_DIR, 'static'),
 ]
-
-# El directorio donde collectstatic copiará los archivos para producción
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') 
 # Storage para producción (WhiteNoise)
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage' 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # --- CONFIGURACIÓN PERSONALIZADA ---
-
 AUTH_USER_MODEL = 'core.Usuario'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:4200",
 ]
-# Agregamos la URL de Render para CORS
 if RENDER_EXTERNAL_HOSTNAME:
     CORS_ALLOWED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
     
