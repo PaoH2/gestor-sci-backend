@@ -2,18 +2,20 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from core.views import (
+    CategoriaViewSet,
     UsuarioViewSet, 
     ProductoViewSet, 
     MovimientoViewSet, 
     DashboardView, 
     CustomLoginView, 
     RegisterView, 
-    VentaViewSet  # <--- ¡AQUÍ ESTABA EL FALTANTE!
+    VentaViewSet 
 )
 
 router = DefaultRouter()
 router.register(r'usuarios', UsuarioViewSet)
 router.register(r'productos', ProductoViewSet)
+router.register(r'categorias', CategoriaViewSet)
 router.register(r'ventas', VentaViewSet, basename='ventas')
 
 urlpatterns = [
@@ -22,7 +24,6 @@ urlpatterns = [
     # Auth
     path('api/login', CustomLoginView.as_view(), name='token_obtain_pair'),
     path('api/register', RegisterView.as_view(), name='register'),
-
     # Dashboard
     path('api/dashboard/metrics', DashboardView.as_view()),
 

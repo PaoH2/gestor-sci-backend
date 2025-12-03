@@ -10,9 +10,10 @@ from datetime import datetime # Importante para la fecha del ticket
 from django.db.models import Sum, F, Q
 
 # Importamos los modelos
-from .models import Usuario, Producto, Movimiento, Venta, DetalleVenta
+from .models import Categoria, Usuario, Producto, Movimiento, Venta, DetalleVenta
 # Importamos los serializadores
 from .serializers import (
+    CategoriaSerializer,
     UsuarioSerializer, 
     ProductoSerializer, 
     MovimientoSerializer, 
@@ -54,6 +55,14 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated(), IsSuperadmin()]
         return [permissions.IsAuthenticated()]
 
+class CategoriaViewSet(viewsets.ModelViewSet):
+    queryset = Categoria.objects.all()
+    serializer_class = CategoriaSerializer
+    
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'destroy']:
+            return [permissions.IsAuthenticated(), IsSuperadmin()]
+        return [permissions.IsAuthenticated()]
 # --- PRODUCTOS ---
 class ProductoViewSet(viewsets.ModelViewSet):
     queryset = Producto.objects.filter(is_active=True)
