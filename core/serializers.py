@@ -26,10 +26,8 @@ class CategoriaSerializer(serializers.ModelSerializer):
 class ProductoSerializer(serializers.ModelSerializer):
     Nombre_Categoria = serializers.CharField(source='categoria.nombre', read_only=True)
     
-    # Campo para LECTURA (GET): Renombrado a 'categoria_id' para el frontend.
     categoria_id = serializers.ReadOnlyField(source='categoria.id')
     
-    # Campo para ESCRITURA (POST/PATCH): Se usará 'categoria_id_write' internamente.
     categoria_id_write = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     
     ID_Producto = serializers.IntegerField(source='id', read_only=True)
@@ -37,7 +35,7 @@ class ProductoSerializer(serializers.ModelSerializer):
     Nombre_Producto = serializers.CharField(source='nombre')
     Descripcion = serializers.CharField(source='descripcion', required=False)
     Costo = serializers.DecimalField(source='costo', max_digits=10, decimal_places=2)
-    Stock_Actual = serializers.IntegerField(source='stock_actual', read_only=True)
+    Stock_Actual = serializers.IntegerField(source='stock_actual', required=False)
     Nivel_Minimo_Stock = serializers.IntegerField(source='nivel_minimo_stock', required=False)
 
     class Meta:
@@ -49,17 +47,20 @@ class ProductoSerializer(serializers.ModelSerializer):
         ]
         
     def create(self, validated_data):
-        categoria_id = validated_data.pop('categoria_id_write', None)
-        if categoria_id:
+        categoria_id = validated_data.pop('categoria_id_write', None) 
+        
+        if categoria_id is not None:
             try:
                 categoria = Categoria.objects.get(id=categoria_id)
                 validated_data['categoria'] = categoria
             except Categoria.DoesNotExist:
-                pass
+                raise serializers.ValidationError({"categoria_id_write": "La categoría seleccionada no existe."})
+        
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
         categoria_id = validated_data.pop('categoria_id_write', None)
+        
         if categoria_id is not None:
             if categoria_id == 0:
                 validated_data['categoria'] = None
