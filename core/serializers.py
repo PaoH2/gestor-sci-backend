@@ -26,10 +26,10 @@ class CategoriaSerializer(serializers.ModelSerializer):
 class ProductoSerializer(serializers.ModelSerializer):
     Nombre_Categoria = serializers.CharField(source='categoria.nombre', read_only=True)
     
-    # Campo para LECTURA: Permite que el ID de la categoría se envíe al frontend (GET)
-    categoria_id_read = serializers.ReadOnlyField(source='categoria.id')
+    # Campo para LECTURA (GET): Renombrado a 'categoria_id' para el frontend.
+    categoria_id = serializers.ReadOnlyField(source='categoria.id')
     
-    # Campo para ESCRITURA: Permite recibir el ID de la categoría al crear/actualizar (POST/PATCH)
+    # Campo para ESCRITURA (POST/PATCH): Se usará 'categoria_id_write' internamente.
     categoria_id_write = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     
     ID_Producto = serializers.IntegerField(source='id', read_only=True)
@@ -45,7 +45,7 @@ class ProductoSerializer(serializers.ModelSerializer):
         fields = [
             'ID_Producto', 'SKU', 'Nombre_Producto', 'Descripcion', 'Costo', 
             'Stock_Actual', 'Nivel_Minimo_Stock', 'Nombre_Categoria', 
-            'categoria_id_read', 'categoria_id_write'
+            'categoria_id', 'categoria_id_write'
         ]
         
     def create(self, validated_data):
