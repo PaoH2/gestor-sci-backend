@@ -25,8 +25,13 @@ class CategoriaSerializer(serializers.ModelSerializer):
 
 class ProductoSerializer(serializers.ModelSerializer):
     Nombre_Categoria = serializers.CharField(source='categoria.nombre', read_only=True)
-    categoria_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
-    # Mapeamos nombres para coincidir con el Frontend
+    
+    # Campo para LECTURA: Permite que el ID de la categoría se envíe al frontend (GET)
+    categoria_id_read = serializers.ReadOnlyField(source='categoria.id')
+    
+    # Campo para ESCRITURA: Permite recibir el ID de la categoría al crear/actualizar (POST/PATCH)
+    categoria_id_write = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    
     ID_Producto = serializers.IntegerField(source='id', read_only=True)
     SKU = serializers.CharField(source='sku')
     Nombre_Producto = serializers.CharField(source='nombre')
@@ -39,31 +44,31 @@ class ProductoSerializer(serializers.ModelSerializer):
         model = Producto
         fields = [
             'ID_Producto', 'SKU', 'Nombre_Producto', 'Descripcion', 'Costo', 
-            'Stock_Actual', 'Nivel_Minimo_Stock', 'Nombre_Categoria', 'categoria_id'
+            'Stock_Actual', 'Nivel_Minimo_Stock', 'Nombre_Categoria', 
+            'categoria_id_read', 'categoria_id_write'
         ]
         
     def create(self, validated_data):
-        categoria_id = validated_data.pop('categoria_id', None)
+        categoria_id = validated_data.pop('categoria_id_write', None)
         if categoria_id:
             try:
                 categoria = Categoria.objects.get(id=categoria_id)
                 validated_data['categoria'] = categoria
             except Categoria.DoesNotExist:
-                # Opcional: Levantar una excepción o ignorar si el ID no es válido
                 pass
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        categoria_id = validated_data.pop('categoria_id', None)
+        categoria_id = validated_data.pop('categoria_id_write', None)
         if categoria_id is not None:
-            if categoria_id == 0: # O algún valor que tu frontend envíe para "sin categoría"
+            if categoria_id == 0:
                 validated_data['categoria'] = None
             else:
                 try:
                     categoria = Categoria.objects.get(id=categoria_id)
                     validated_data['categoria'] = categoria
                 except Categoria.DoesNotExist:
-                    raise serializers.ValidationError({"categoria_id": "La categoría no existe."})
+                    raise serializers.ValidationError({"categoria_id_write": "La categoría no existe."})
 
         return super().update(instance, validated_data)
 
@@ -93,7 +98,6 @@ class DetalleVentaSerializer(serializers.ModelSerializer):
 
 class VentaSerializer(serializers.ModelSerializer):
     Usuario = serializers.CharField(source='usuario.email', read_only=True)
-    # Incluimos los detalles anidados para poder reimprimir el ticket
     detalles = DetalleVentaSerializer(many=True, read_only=True)
     
     class Meta:
